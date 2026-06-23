@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>داشبورد الجرد والرصيد</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
+<style>
+  :root {
+    --bg: #f8f7f4;
+    --surface: #ffffff;
+    --surface2: #f1f0eb;
+    --border: rgba(0,0,0,0.12);
+    --border2: rgba(0,0,0,0.22);
+    --text: #1a1a18;
+    --text2: #5f5e5a;
+    --text3: #888780;
+    --purple: #534AB7;
+    --purple-bg: #EEEDFE;
+    --purple-text: #3C3489;
+    --teal: #0F6E56;
+    --teal-bg: #E1F5EE;
+    --red: #A32D2D;
+    --red-bg: #FCEBEB;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  [data-theme="dark"] {
+    --bg: #1c1c1a;
+    --surface: #262624;
+    --surface2: #2e2e2b;
+    --border: rgba(255,255,255,0.1);
+    --border2: rgba(255,255,255,0.2);
+    --text: #f0efe8;
+    --text2: #b4b2a9;
+    --text3: #888780;
+    --purple-bg: #2d2a5e;
+    --purple-text: #a9a4e8;
+    --teal-bg: #0a2e23;
+    --red-bg: #2e1414;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 15px; }
+
+  /* HEADER */
+  .header { background: var(--surface); border-bottom: 0.5px solid var(--border); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .header h1 { font-size: 17px; font-weight: 500; }
+  .header .sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+
+  /* LAYOUT */
+  .main { display: flex; min-height: calc(100vh - 57px); }
+  .sidebar { width: 200px; background: var(--surface); border-left: 0.5px solid var(--border); padding: 16px 0; flex-shrink: 0; position: sticky; top: 57px; height: calc(100vh - 57px); overflow-y: auto; }
+  .content { flex: 1; padding: 24px; max-width: 980px; }
+
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 18px; font-size: 13px; color: var(--text2); cursor: pointer; border-left: 3px solid transparent; transition: .15s; }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--purple-bg); color: var(--purple); border-left-color: var(--purple); font-weight: 500; }
+  .nav-item i { font-size: 17px; }
+
+  /* SECTIONS */
+  .section { display: none; }
+  .section.active { display: block; }
+  .section-title { font-size: 16px; font-weight: 500; margin-bottom: 18px; }
+
+  /* CARDS */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .card { background: var(--surface2); border-radius: 8px; padding: 14px; text-align: center; }
+  .card .lbl { font-size: 11px; color: var(--text2); margin-bottom: 6px; letter-spacing: .4px; }
+  .card .val { font-size: 20px; font-weight: 500; color: var(--text); }
+  .card.plus .val { color: var(--teal); }
+  .card.minus .val { color: var(--red); }
+  .card.highlight { background: var(--purple-bg); }
+  .card.highlight .val { color: var(--purple); }
+  .card.result-pos { background: var(--teal-bg); }
+  .card.result-pos .val { color: var(--teal); }
+  .card.result-neg { background: var(--red-bg); }
+  .card.result-neg .val { color: var(--red); }
+
+  /* BOX */
+  .box { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 14px; }
+  .box h3 { font-size: 12px; color: var(--text2); font-weight: 500; margin-bottom: 14px; text-transform: uppercase; letter-spacing: .4px; }
+
+  /* FORMULA */
+  .formula-box { background: var(--purple-bg); border-radius: 8px; padding: 14px 18px; font-size: 13px; color: var(--purple-text); margin-bottom: 18px; line-height: 1.9; }
+  .formula-box strong { font-weight: 500; }
+
+  /* UPLOAD ZONE */
+  .upload-zone { border: 1.5px dashed var(--border2); border-radius: var(--radius); padding: 28px 20px; text-align: center; cursor: pointer; transition: .2s; margin-bottom: 10px; background: var(--surface); }
+  .upload-zone:hover { background: var(--surface2); border-color: var(--purple); }
+  .upload-zone i { font-size: 30px; color: var(--text3); display: block; margin-bottom: 8px; }
+  .upload-zone .zt { font-size: 13px; color: var(--text2); font-weight: 500; }
+  .upload-zone .zs { font-size: 11px; color: var(--text3); margin-top: 5px; line-height: 1.6; }
+  .upload-zone.done { border-color: var(--teal); border-style: solid; background: var(--teal-bg); }
+  .upload-zone.done i, .upload-zone.done .zt { color: var(--teal); }
+  input[type=file] { display: none; }
+
+  /* GRID 2 */
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  /* MANUAL ROW */
+  .manual-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .manual-row label { font-size: 13px; color: var(--text2); min-width: 65px; }
+  .manual-row input[type=text], .manual-row input[type=number] { flex: 1; padding: 7px 10px; border: 0.5px solid var(--border2); border-radius: var(--radius-sm); background: var(--surface2); color: var(--text); font-size: 13px; outline: none; }
+  .manual-row input:focus { border-color: var(--purple); }
+
+  /* BUTTONS */
+  .btn { padding: 8px 16px; border: 0.5px solid var(--border2); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: .15s; }
+  .btn:hover { background: var(--surface2); }
+  .btn.primary { background: var(--purple); color: #fff; border-color: var(--purple); }
+  .btn.primary:hover { background: var(--purple-text); }
+  .btn.sm { padding: 5px 10px; font-size: 12px; }
+
+  /* TABLES */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: var(--surface2); padding: 9px 12px; text-align: right; font-weight: 500; color: var(--text2); border-bottom: 0.5px solid var(--border); font-size: 12px; }
+  td { padding: 9px 12px; text-align: right; border-bottom: 0.5px solid var(--border); color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .empty-row td { text-align: center; color: var(--text3); padding: 20px; }
+
+  /* DAY GRID */
+  .day-picker { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .day-picker label { font-size: 13px; color: var(--text2); }
+  .day-picker input[type=number] { width: 70px; padding: 7px 10px; border: 0.5px solid var(--border2); border-radius: var(--radius-sm); background: var(--surface2); color: var(--text); font-size: 14px; outline: none; }
+  .day-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; margin-bottom: 18px; }
+  .day-cell { border: 0.5px solid var(--border2); border-radius: 8px; padding: 10px 6px; cursor: pointer; background: var(--surface2); text-align: center; transition: .15s; }
+  .day-cell:hover { background: var(--purple-bg); border-color: var(--purple); }
+  .day-cell.done { background: var(--teal-bg); border-color: var(--teal); border-style: solid; }
+  .day-cell i { font-size: 18px; color: var(--text3); }
+  .day-cell.done i { color: var(--teal); }
+  .day-cell .dlbl { font-size: 11px; color: var(--text2); margin-top: 4px; }
+  .day-cell.done .dlbl { color: var(--teal); font-weight: 500; }
+
+  /* PROGRESS */
+  .progress-wrap { margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .progress-bar { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--purple); border-radius: 3px; transition: .4s; }
+  .progress-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
+
+  /* BADGES */
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge.ok { background: var(--teal-bg); color: var(--teal); }
+  .badge.warn { background: var(--red-bg); color: var(--red); }
+  .badge.neu { background: var(--purple-bg); color: var(--purple-text); }
+
+  /* THEME TOGGLE */
+  .theme-btn { padding: 7px 12px; border: 0.5px solid var(--border2); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); cursor: pointer; font-size: 13px; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--surface); padding: 10px 20px; border-radius: 8px; font-size: 13px; opacity: 0; transition: .3s; z-index: 999; pointer-events: none; }
+  .toast.show { opacity: 1; }
+
+  /* RESPONSIVE */
+  @media print {
+    .header, .sidebar, [style*="display:flex;gap:10px"] { display: none !important; }
+    .main { display: block !important; }
+    .content { padding: 0 !important; max-width: 100% !important; }
+    .section { display: none !important; }
+    #s-report { display: block !important; }
+    .box { border: 1px solid #ccc !important; break-inside: avoid; }
+    body { background: white !important; color: black !important; }
+    table { font-size: 11px !important; }
+    th, td { padding: 5px 7px !important; border: 0.5px solid #ccc !important; }
+    .badge.ok { background: #d1fae5 !important; color: #065f46 !important; }
+    .badge.warn { background: #fee2e2 !important; color: #991b1b !important; }
+    .badge.neu { background: #ede9fe !important; color: #4c1d95 !important; }
+    .card { border: 1px solid #ccc !important; background: #f9f9f9 !important; }
+    .card.highlight { background: #ede9fe !important; }
+    .card.result-pos { background: #d1fae5 !important; }
+    .card.result-neg { background: #fee2e2 !important; }
+    #report-summary { display: grid !important; grid-template-columns: repeat(3,1fr) !important; }
+    .section-title { font-size: 18px !important; font-weight: bold !important; margin-bottom: 12px !important; }
+  }
+    .main { flex-direction: column; }
+    .sidebar { width: 100%; height: auto; position: static; display: flex; overflow-x: auto; padding: 0; border-left: none; border-bottom: 0.5px solid var(--border); }
+    .nav-item { border-left: none; border-bottom: 3px solid transparent; white-space: nowrap; padding: 12px 14px; flex-direction: column; gap: 3px; font-size: 11px; }
+    .nav-item.active { border-bottom-color: var(--purple); border-left-color: transparent; }
+    .row2 { grid-template-columns: 1fr; }
+    .content { padding: 16px; }
+    .cards { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>📦 داشبورد الجرد والرصيد</h1>
+    <div class="sub">رصيد دفترى vs رصيد فعلى — عجز / زيادة</div>
+  </div>
+  <div class="header-actions">
+    <button class="theme-btn" onclick="toggleTheme()"><i class="ti ti-moon"></i></button>
+    <button class="btn primary" onclick="calcAll()"><i class="ti ti-calculator"></i> احسب الكل</button>
+  </div>
+</div>
+
+<div class="main">
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="nav-item active" onclick="showTab('home')"><i class="ti ti-layout-dashboard"></i><span>الرصيد</span></div>
+    <div class="nav-item" onclick="showTab('recv')"><i class="ti ti-truck"></i><span>الاستلامات</span></div>
+    <div class="nav-item" onclick="showTab('move')"><i class="ti ti-arrows-exchange"></i><span>وارد / صادر</span></div>
+    <div class="nav-item" onclick="showTab('sales')"><i class="ti ti-shopping-cart"></i><span>المبيعات</span></div>
+    <div class="nav-item" onclick="showTab('waste')"><i class="ti ti-trash"></i><span>ويست</span></div>
+    <div class="nav-item" onclick="showTab('hosp')"><i class="ti ti-coffee"></i><span>ضيافات</span></div>
+    <div class="nav-item" onclick="showTab('stock')"><i class="ti ti-building-warehouse"></i><span>الجرد الفعلى</span></div>
+    <div class="nav-item" onclick="showTab('report')"><i class="ti ti-report-analytics"></i><span>التقرير</span></div>
+  </nav>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- HOME -->
+    <div class="section active" id="s-home">
+      <p class="section-title">ملخص الرصيد</p>
+      <div class="formula-box">
+        <strong>معادلة الرصيد الدفترى:</strong><br>
+        رصيد أول + استلامات + وارد − صادر − مبيعات (محسوبة) − ويست − ضيافات = رصيد دفترى
+      </div>
+      <div class="box">
+        <h3>رصيد أول المدة</h3>
+        <input type="file" id="f-opening" accept=".xlsx,.xls,.csv" style="display:none">
+        <label for="f-opening" class="upload-zone" id="uz-opening" style="padding:18px 20px;display:block;cursor:pointer">
+          <i class="ti ti-table-import"></i>
+          <div class="zt">رفع شيت رصيد أول المدة</div>
+          <div class="zs">كول A: الصنف المخزنى | كول B: الكمية</div>
+        </label>
+        <div class="table-wrap" id="opening-preview" style="margin-top:10px;display:none"><table>
+          <thead><tr><th>الصنف</th><th>الكمية</th></tr></thead>
+          <tbody id="opening-tbody"></tbody>
+        </table></div>
+      </div>
+      <div class="cards">
+        <div class="card"><div class="lbl">رصيد أول</div><div class="val" id="c-open">—</div></div>
+        <div class="card plus"><div class="lbl">+ استلامات</div><div class="val" id="c-recv">—</div></div>
+        <div class="card plus"><div class="lbl">+ وارد</div><div class="val" id="c-in">—</div></div>
+        <div class="card minus"><div class="lbl">− صادر</div><div class="val" id="c-out">—</div></div>
+        <div class="card minus"><div class="lbl">− مبيعات</div><div class="val" id="c-sales">—</div></div>
+        <div class="card minus"><div class="lbl">− ويست</div><div class="val" id="c-waste">—</div></div>
+        <div class="card minus"><div class="lbl">− ضيافات</div><div class="val" id="c-hosp">—</div></div>
+        <div class="card highlight"><div class="lbl">رصيد دفترى</div><div class="val" id="c-book">—</div></div>
+        <div class="card"><div class="lbl">رصيد فعلى</div><div class="val" id="c-actual">—</div></div>
+      </div>
+      <div class="cards">
+        <div class="card" id="diff-card"><div class="lbl">الفرق — عجز / زيادة</div><div class="val" id="c-diff">—</div></div>
+      </div>
+    </div>
+
+    <!-- RECV -->
+    <div class="section" id="s-recv">
+      <p class="section-title">الاستلامات — شيتات يومية</p>
+      <div class="day-picker">
+        <label>اليوم الحالى:</label>
+        <input type="number" id="cur-day" value="15" min="1" max="31" oninput="updateDaySlots()">
+        <span style="font-size:13px;color:var(--text2)">سيتم رفع <strong id="day-count">15</strong> شيت</span>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" id="recv-progress" style="width:0%"></div></div>
+        <span class="progress-label" id="recv-progress-label">0 / 15 شيت</span>
+      </div>
+      <div class="day-grid" id="day-slots"></div>
+      <div class="box">
+        <h3>إجمالى الاستلامات بالصنف</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>الصنف</th><th>الإجمالى</th></tr></thead>
+          <tbody id="recv-tbody"><tr class="empty-row"><td colspan="2">لم يتم رفع شيتات بعد</td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- MOVE -->
+    <div class="section" id="s-move">
+      <p class="section-title">وارد وصادر</p>
+      <div class="row2">
+        <div>
+          <input type="file" id="f-in" accept=".xlsx,.xls,.csv" style="display:none">
+          <label for="f-in" class="upload-zone" id="uz-in" style="display:block;cursor:pointer">
+            <i class="ti ti-arrow-down-circle"></i>
+            <div class="zt">شيت الوارد</div>
+            <div class="zs">كول A: الصنف<br>كول B: الكمية</div>
+          </label>
+        </div>
+        <div>
+          <input type="file" id="f-out" accept=".xlsx,.xls,.csv" style="display:none">
+          <label for="f-out" class="upload-zone" id="uz-out" style="display:block;cursor:pointer">
+            <i class="ti ti-arrow-up-circle"></i>
+            <div class="zt">شيت الصادر</div>
+            <div class="zs">كول A: الصنف<br>كول B: الكمية</div>
+          </label>
+        </div>
+      </div>
+      <div class="box">
+        <h3>تفاصيل الوارد والصادر</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>الصنف</th><th>وارد</th><th>صادر</th><th>صافى</th></tr></thead>
+          <tbody id="move-tbody"><tr class="empty-row"><td colspan="4">ارفع الشيتات</td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- SALES -->
+    <div class="section" id="s-sales">
+      <p class="section-title">المبيعات — حساب الاستهلاك من المخزن</p>
+      <div class="formula-box">
+        <strong>شكل شيت الوصفات (Pivot):</strong><br>
+        الصف الأول (header): الخلية A1 فاضية — ثم أسماء الأصناف المخزنية فى B1 و C1 و D1 ...<br>
+        الصفوف التالية: كول A = اسم الصنف البيعى — وقدامه فى كل عمود الكمية المستهلكة من الصنف المخزنى ده لكل وحدة مباعة<br>
+        <strong>شيت المبيعات:</strong> كول A = الصنف البيعى | كول B = عدد الوحدات المباعة
+      </div>
+      <div class="row2">
+        <div>
+          <input type="file" id="f-recipe" accept=".xlsx,.xls,.csv" style="display:none">
+          <label for="f-recipe" class="upload-zone" id="uz-recipe" style="display:block;cursor:pointer">
+            <i class="ti ti-file-spreadsheet"></i>
+            <div class="zt">شيت الوصفات (Pivot)</div>
+            <div class="zs">Row 1: أسماء الأصناف المخزنية<br>Col A: أسماء الأصناف البيعية<br>الخلايا: الكمية المستهلكة</div>
+          </label>
+        </div>
+        <div>
+          <input type="file" id="f-sold" accept=".xlsx,.xls,.csv" style="display:none">
+          <label for="f-sold" class="upload-zone" id="uz-sold" style="display:block;cursor:pointer">
+            <i class="ti ti-receipt"></i>
+            <div class="zt">شيت المبيعات (Sold)</div>
+            <div class="zs">A: الصنف البيعى | B: الكمية المباعة</div>
+          </label>
+        </div>
+      </div>
+      <div class="box" id="recipe-preview-box" style="display:none">
+        <h3>معاينة الوصفات</h3>
+        <div class="table-wrap" id="recipe-preview-wrap"></div>
+      </div>
+      <div class="box">
+        <h3>الاستهلاك المحسوب من المخزن</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>الصنف المخزنى</th><th>الكمية المستهلكة</th></tr></thead>
+          <tbody id="sales-tbody"><tr class="empty-row"><td colspan="2">ارفع شيت الوصفات والمبيعات</td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- WASTE -->
+    <div class="section" id="s-waste">
+      <p class="section-title">الويست (هالك)</p>
+      <input type="file" id="f-waste" accept=".xlsx,.xls,.csv" style="display:none">
+      <label for="f-waste" class="upload-zone" id="uz-waste" style="display:block;cursor:pointer">
+        <i class="ti ti-trash"></i>
+        <div class="zt">شيت الويست</div>
+        <div class="zs">كول A: الصنف | كول B: الكمية</div>
+      </label>
+      <div class="box">
+        <div class="table-wrap"><table>
+          <thead><tr><th>الصنف</th><th>الكمية</th></tr></thead>
+          <tbody id="waste-tbody"><tr class="empty-row"><td colspan="2">ارفع الشيت</td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- HOSP -->
+    <div class="section" id="s-hosp">
+      <p class="section-title">الضيافات</p>
+      <div class="formula-box">
+        <strong>شكل شيت الوصفات (Pivot):</strong><br>
+        نفس شيت وصفات المبيعات — صف أول: أسماء الأصناف المخزنية — كول A: اسم الضيافة — الخلايا: الكمية المستهلكة<br>
+        <strong>شيت الضيافات:</strong> كول A = اسم الضيافة | كول B = عدد الوحدات
+      </div>
+      <div class="row2">
+        <div>
+          <input type="file" id="f-hosp-recipe" accept=".xlsx,.xls,.csv" style="display:none">
+          <label for="f-hosp-recipe" class="upload-zone" id="uz-hosp-recipe" style="display:block;cursor:pointer">
+            <i class="ti ti-file-spreadsheet"></i>
+            <div class="zt">وصفات الضيافات (Pivot)</div>
+            <div class="zs">Row 1: أصناف مخزنية | Col A: اسم الضيافة | الخلايا: الكمية</div>
+          </label>
+        </div>
+        <div>
+          <input type="file" id="f-hosp" accept=".xlsx,.xls,.csv" style="display:none">
+          <label for="f-hosp" class="upload-zone" id="uz-hosp" style="display:block;cursor:pointer">
+            <i class="ti ti-coffee"></i>
+            <div class="zt">شيت الضيافات (Sold)</div>
+            <div class="zs">A: اسم الضيافة | B: عدد الوحدات</div>
+          </label>
+        </div>
+      </div>
+      <div class="box" id="hosp-recipe-preview-box" style="display:none">
+        <h3>معاينة وصفات الضيافات</h3>
+        <div class="table-wrap" id="hosp-recipe-preview-wrap"></div>
+      </div>
+      <div class="box">
+        <h3>الاستهلاك المحسوب من المخزن</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>الصنف المخزنى</th><th>الكمية المستهلكة</th></tr></thead>
+          <tbody id="hosp-tbody"><tr class="empty-row"><td colspan="2">ارفع شيت الوصفات والضيافات</td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- STOCK -->
+    <div class="section" id="s-stock">
+      <p class="section-title">الجرد الفعلى</p>
+      <input type="file" id="f-stock" accept=".xlsx,.xls,.csv" style="display:none">
+      <label for="f-stock" class="upload-zone" id="uz-stock" style="display:block;cursor:pointer">
+        <i class="ti ti-building-warehouse"></i>
+        <div class="zt">شيت الجرد الفعلى</div>
+        <div class="zs">كول A: الصنف | كول B: الكمية الفعلية</div>
+      </label>
+      <div class="box">
+        <div class="table-wrap"><table>
+          <thead><tr><th>الصنف</th><th>الكمية الفعلية</th></tr></thead>
+          <tbody id="stock-tbody"><tr class="empty-row"><td colspan="2">ارفع الشيت</td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- REPORT -->
+    <div class="section" id="s-report">
+      <p class="section-title">تقرير المقارنة — دفترى vs فعلى</p>
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <button class="btn" onclick="calcAll()"><i class="ti ti-refresh"></i> تحديث</button>
+        <button class="btn primary" onclick="exportReport()"><i class="ti ti-download"></i> تصدير Excel</button>
+        <button class="btn" onclick="exportCSV()"><i class="ti ti-file-text"></i> تصدير CSV</button>
+        <button class="btn" onclick="exportPDF()"><i class="ti ti-file-type-pdf"></i> تصدير PDF</button>
+      </div>
+      <div class="cards" id="report-summary" style="margin-bottom:20px"></div>
+      <div class="box">
+        <div class="table-wrap"><table>
+          <thead><tr><th>الصنف</th><th>رصيد أول</th><th>استلامات</th><th>وارد</th><th>صادر</th><th>مبيعات</th><th>ويست</th><th>ضيافات</th><th>دفترى</th><th>فعلى</th><th>الفرق</th><th>الحالة</th></tr></thead>
+          <tbody id="report-tbody"><tr class="empty-row"><td colspan="12">اضغط "احسب الكل" أو "تحديث"</td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const state = {
+  opening: {},
+  recv: {},
+  inMove: {},
+  outMove: {},
+  recipes: [],
+  sold: {},
+  hospRecipes: [],
+  hospSold: {},
+  waste: {},
+  hosp: {},
+  stock: {},
+  salesConsumption: {},
+  hospConsumption: {}
+};
+
+const dayData = {};
+let itemCount = 0;
+
+// ─── THEME ───────────────────────────────────────────────
+function toggleTheme() {
+  const d = document.documentElement;
+  const isDark = d.getAttribute('data-theme') === 'dark';
+  d.setAttribute('data-theme', isDark ? '' : 'dark');
+  localStorage.setItem('theme', isDark ? 'light' : 'dark');
+}
+(function() {
+  const t = localStorage.getItem('theme');
+  if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+})();
+
+// ─── TOAST ───────────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ─── TABS ─────────────────────────────────────────────────
+function showTab(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('s-' + id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+// ─── OPENING (now upload-based) ───────────────────────────
+function getOpening() {
+  return state.opening; // already populated by loadSheet('opening',...)
+}
+
+// ─── FILE UTILS ──────────────────────────────────────────
+
+function readXLSX(file, cb) {
+  const r = new FileReader();
+  r.onload = e => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+      cb(rows);
+    } catch(err) {
+      console.error('XLSX Error:', err);
+      toast('خطأ: ' + (err.message || err.toString()).slice(0, 80));
+    }
+  };
+  r.onerror = () => toast('فشل فى فتح الملف');
+  r.readAsArrayBuffer(file);
+}
+
+function cleanKey(raw) {
+  // شيل كل أنواع المسافات من أول وآخر الاسم (عادية + unicode خفية)
+  return String(raw || '').replace(/^[\s\u00A0\u200B\u200C\u200D\uFEFF]+|[\s\u00A0\u200B\u200C\u200D\uFEFF]+$/g, '');
+}
+
+function rowsToMap(rows) {
+  const m = {};
+  rows.slice(1).forEach(r => {
+    const k = cleanKey(r[0]);
+    const v = parseFloat(String(r[1] || '').replace(/,/g, '')) || 0;
+    if (k) m[k] = (m[k] || 0) + v;
+  });
+  return m;
+}
+
+function fmt(n) { return Math.round(n * 1000) / 1000; }
+function sumMap(m) { return Object.values(m).reduce((a, b) => a + b, 0); }
+
+function markDone(id, name) {
+  const z = document.getElementById(id);
+  if (!z) return;
+  z.classList.add('done');
+  z.querySelector('.zt').textContent = '✓ ' + name;
+}
+
+function renderSimpleTable(tbodyId, data, cols) {
+  const tb = document.getElementById(tbodyId);
+  const keys = Object.keys(data);
+  if (!keys.length) {
+    tb.innerHTML = `<tr class="empty-row"><td colspan="${cols}">لا يوجد بيانات</td></tr>`;
+    return;
+  }
+  tb.innerHTML = keys.map(k => `<tr><td>${k}</td><td>${fmt(data[k])}</td></tr>`).join('');
+}
+
+// ─── SHEET LOADERS ───────────────────────────────────────
+function loadFile(type, file) {
+  readXLSX(file, rows => {
+    const m = rowsToMap(rows);
+    if (type === 'opening') {
+      state.opening = m;
+      markDone('uz-opening', file.name);
+      const keys = Object.keys(m);
+      if (keys.length) {
+        const tb = document.getElementById('opening-tbody');
+        tb.innerHTML = keys.map(k => `<tr><td>${k}</td><td>${fmt(m[k])}</td></tr>`).join('');
+        document.getElementById('opening-preview').style.display = '';
+      }
+    }
+    else if (type === 'in')    { state.inMove = m;  renderMoveTable(); markDone('uz-in', file.name); }
+    else if (type === 'out')   { state.outMove = m; renderMoveTable(); markDone('uz-out', file.name); }
+    else if (type === 'waste') { state.waste = m;   renderSimpleTable('waste-tbody', m, 2); markDone('uz-waste', file.name); }
+    else if (type === 'hosp')  { state.hospSold = m; calcHospConsumption(); markDone('uz-hosp', file.name); }
+    else if (type === 'stock') { state.stock = m;   renderSimpleTable('stock-tbody', m, 2); markDone('uz-stock', file.name); }
+    toast('✓ تم رفع ' + file.name);
+  });
+}
+
+function renderMoveTable() {
+  const keys = [...new Set([...Object.keys(state.inMove), ...Object.keys(state.outMove)])];
+  const tb = document.getElementById('move-tbody');
+  if (!keys.length) { tb.innerHTML = '<tr class="empty-row"><td colspan="4">ارفع الشيتات</td></tr>'; return; }
+  tb.innerHTML = keys.map(k => {
+    const i = state.inMove[k] || 0, o = state.outMove[k] || 0, n = i - o;
+    return `<tr><td>${k}</td><td>${fmt(i)}</td><td>${fmt(o)}</td>
+      <td style="color:${n >= 0 ? 'var(--teal)' : 'var(--red)'};font-weight:500">${fmt(n)}</td></tr>`;
+  }).join('');
+}
+
+// ─── RECIPES & SALES ─────────────────────────────────────
+function loadRecipes(file) {
+  readXLSX(file, rows => {
+    if (rows.length < 2) { toast('الشيت فاضى!'); return; }
+
+    // Row 0 = headers: A1 empty, then store item names in B1, C1, D1 ...
+    const headerRow = rows[0];
+    const storeItems = headerRow.slice(1).map(h => cleanKey(h)).filter(h => h);
+
+    // Build recipes array from pivot
+    state.recipes = [];
+    rows.slice(1).forEach(row => {
+      const saleItem = cleanKey(row[0]);
+      if (!saleItem) return;
+      storeItems.forEach((storeItem, idx) => {
+        const qty = parseFloat(row[idx + 1]) || 0;
+        if (qty > 0) {
+          state.recipes.push({ sale: saleItem, store: storeItem, qty });
+        }
+      });
+    });
+
+    // Show pivot preview table
+    const previewBox = document.getElementById('recipe-preview-box');
+    const previewWrap = document.getElementById('recipe-preview-wrap');
+    previewBox.style.display = '';
+    const saleRows = rows.slice(1).filter(r => String(r[0] || '').trim());
+    let html = '<table><thead><tr><th>صنف بيعى \\ مخزنى</th>';
+    storeItems.forEach(s => { html += `<th>${s}</th>`; });
+    html += '</tr></thead><tbody>';
+    saleRows.forEach(row => {
+      const saleItem = String(row[0] || '').trim();
+      html += `<tr><td><strong>${saleItem}</strong></td>`;
+      storeItems.forEach((_, idx) => {
+        const v = parseFloat(row[idx + 1]) || 0;
+        html += `<td style="${v > 0 ? 'color:var(--purple);font-weight:500' : 'color:var(--text3)'}">${v || '—'}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    previewWrap.innerHTML = html;
+
+    calcSalesConsumption();
+    markDone('uz-recipe', file.name);
+    toast(`✓ تم رفع الوصفات — ${state.recipes.length} ارتباط`);
+  });
+}
+
+function loadSold(file) {
+  readXLSX(file, rows => {
+    state.sold = rowsToMap(rows);
+    const count = Object.keys(state.sold).length;
+    calcSalesConsumption();
+    markDone('uz-sold', file.name);
+    toast(`✓ تم رفع المبيعات — ${count} صنف`);
+  });
+}
+
+function calcSalesConsumption() {
+  const consumption = {};
+  state.recipes.forEach(({ sale, store, qty }) => {
+    const sold = state.sold[sale] || 0;
+    consumption[store] = (consumption[store] || 0) + (sold * qty);
+  });
+  state.salesConsumption = consumption;
+  const tb = document.getElementById('sales-tbody');
+  const keys = Object.keys(consumption);
+  if (!keys.length) { tb.innerHTML = '<tr class="empty-row"><td colspan="2">ارفع شيت الوصفات والمبيعات</td></tr>'; return; }
+  tb.innerHTML = keys.map(k => `<tr><td>${k}</td><td>${fmt(consumption[k])}</td></tr>`).join('');
+}
+
+function loadHospRecipes(file) {
+  readXLSX(file, rows => {
+    if (rows.length < 2) { toast('الشيت فاضى!'); return; }
+    const headerRow = rows[0];
+    const storeItems = headerRow.slice(1).map(h => cleanKey(h)).filter(h => h);
+    state.hospRecipes = [];
+    rows.slice(1).forEach(row => {
+      const hospItem = cleanKey(row[0]);
+      if (!hospItem) return;
+      storeItems.forEach((storeItem, idx) => {
+        const qty = parseFloat(row[idx + 1]) || 0;
+        if (qty > 0) state.hospRecipes.push({ hosp: hospItem, store: storeItem, qty });
+      });
+    });
+    // preview
+    const previewBox = document.getElementById('hosp-recipe-preview-box');
+    const previewWrap = document.getElementById('hosp-recipe-preview-wrap');
+    previewBox.style.display = '';
+    const hospRows = rows.slice(1).filter(r => cleanKey(r[0]));
+    let html = '<table><thead><tr><th>ضيافة \\ مخزنى</th>';
+    storeItems.forEach(s => { html += `<th>${s}</th>`; });
+    html += '</tr></thead><tbody>';
+    hospRows.forEach(row => {
+      const hospItem = cleanKey(row[0]);
+      html += `<tr><td><strong>${hospItem}</strong></td>`;
+      storeItems.forEach((_, idx) => {
+        const v = parseFloat(row[idx + 1]) || 0;
+        html += `<td style="${v > 0 ? 'color:var(--purple);font-weight:500' : 'color:var(--text3)'}">${v || '—'}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    previewWrap.innerHTML = html;
+    calcHospConsumption();
+    markDone('uz-hosp-recipe', file.name);
+    toast(`✓ تم رفع وصفات الضيافات — ${state.hospRecipes.length} ارتباط`);
+  });
+}
+
+function calcHospConsumption() {
+  const consumption = {};
+  state.hospRecipes.forEach(({ hosp, store, qty }) => {
+    const sold = state.hospSold[hosp] || 0;
+    consumption[store] = (consumption[store] || 0) + (sold * qty);
+  });
+  state.hosp = consumption;
+  const tb = document.getElementById('hosp-tbody');
+  const keys = Object.keys(consumption);
+  if (!keys.length) { tb.innerHTML = '<tr class="empty-row"><td colspan="2">ارفع شيت الوصفات والضيافات</td></tr>'; return; }
+  tb.innerHTML = keys.map(k => `<tr><td>${k}</td><td>${fmt(consumption[k])}</td></tr>`).join('');
+}
+
+// ─── DAILY RECV ──────────────────────────────────────────
+function updateDaySlots() {
+  const n = parseInt(document.getElementById('cur-day').value) || 1;
+  document.getElementById('day-count').textContent = n;
+  const uploaded = Object.keys(dayData).length;
+  const pct = Math.round(uploaded / n * 100);
+  document.getElementById('recv-progress').style.width = pct + '%';
+  document.getElementById('recv-progress-label').textContent = `${uploaded} / ${n} شيت`;
+
+  const grid = document.getElementById('day-slots');
+  grid.innerHTML = '';
+  for (let i = 1; i <= n; i++) {
+    const done = !!dayData[i];
+    const el = document.createElement('div');
+    el.className = 'day-cell' + (done ? ' done' : '');
+    el.innerHTML = `<i class="ti ti-${done ? 'check' : 'upload'}"></i><div class="dlbl">يوم ${i}</div>`;
+    el.onclick = (function(day) {
+      return function() {
+        const fi = document.createElement('input');
+        fi.type = 'file';
+        fi.accept = '.xlsx,.xls,.csv';
+        fi.onchange = e => loadDaySheet(day, e.target);
+        fi.click();
+      };
+    })(i);
+    grid.appendChild(el);
+  }
+}
+
+function loadDaySheet(day, inp) {
+  const file = inp.files[0];
+  if (!file) return;
+  readXLSX(file, rows => {
+    dayData[day] = rowsToMap(rows);
+    aggregateRecv();
+    updateDaySlots();
+    toast(`✓ تم رفع يوم ${day}`);
+  });
+}
+
+function aggregateRecv() {
+  const total = {};
+  Object.values(dayData).forEach(m => Object.entries(m).forEach(([k, v]) => { total[k] = (total[k] || 0) + v; }));
+  state.recv = total;
+  renderSimpleTable('recv-tbody', total, 2);
+}
+
+// ─── CALC ALL ────────────────────────────────────────────
+function calcAll() {
+  const open   = sumMap(state.opening);
+  const recv   = sumMap(state.recv);
+  const inM    = sumMap(state.inMove);
+  const outM   = sumMap(state.outMove);
+  const sales  = sumMap(state.salesConsumption);
+  const waste  = sumMap(state.waste);
+  const hosp   = sumMap(state.hosp);
+  const book   = open + recv + inM - outM - sales - waste - hosp;
+  const actual = sumMap(state.stock);
+  const diff   = actual - book;
+
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = fmt(v); };
+  set('c-open', open); set('c-recv', recv); set('c-in', inM); set('c-out', outM);
+  set('c-sales', sales); set('c-waste', waste); set('c-hosp', hosp);
+  set('c-book', book); set('c-actual', actual); set('c-diff', diff);
+
+  const dc = document.getElementById('diff-card');
+  if (dc) {
+    dc.className = 'card ' + (diff > 0 ? 'result-pos' : diff < 0 ? 'result-neg' : 'highlight');
+  }
+
+  buildReport(open, recv, inM, outM, sales, waste, hosp, book, actual, diff);
+  toast('تم الحساب بنجاح ✓');
+}
+
+function buildReport(open, recv, inM, outM, sales, waste, hosp, book, actual, diff) {
+  // summary cards
+  const rs = document.getElementById('report-summary');
+  const defStr = d => d > 0 ? `<span style="color:var(--teal)">+${fmt(d)}</span>` : d < 0 ? `<span style="color:var(--red)">${fmt(d)}</span>` : fmt(d);
+  rs.innerHTML = `
+    <div class="card highlight"><div class="lbl">رصيد دفترى</div><div class="val">${fmt(book)}</div></div>
+    <div class="card"><div class="lbl">رصيد فعلى</div><div class="val">${fmt(actual)}</div></div>
+    <div class="card ${diff > 0 ? 'result-pos' : diff < 0 ? 'result-neg' : ''}"><div class="lbl">الفرق</div><div class="val">${defStr(diff)}</div></div>`;
+
+  const allKeys = [...new Set([
+    ...Object.keys(state.opening),
+    ...Object.keys(state.recv),
+    ...Object.keys(state.inMove),
+    ...Object.keys(state.outMove),
+    ...Object.keys(state.salesConsumption),
+    ...Object.keys(state.waste),
+    ...Object.keys(state.hosp),
+    ...Object.keys(state.stock)
+  ])];
+
+  const tb = document.getElementById('report-tbody');
+  if (!allKeys.length) { tb.innerHTML = '<tr class="empty-row"><td colspan="12">لا يوجد بيانات بعد</td></tr>'; return; }
+
+  tb.innerHTML = allKeys.map(k => {
+    const op  = state.opening[k] || 0;
+    const rv  = state.recv[k] || 0;
+    const im  = state.inMove[k] || 0;
+    const om  = state.outMove[k] || 0;
+    const sl  = (state.salesConsumption)[k] || 0;
+    const ws  = state.waste[k] || 0;
+    const hp  = state.hosp[k] || 0;
+    const bk  = op + rv + im - om - sl - ws - hp;
+    const ac  = state.stock[k] || 0;
+    const df  = ac - bk;
+    const badge = df === 0
+      ? '<span class="badge neu">مطابق</span>'
+      : df > 0
+        ? `<span class="badge ok">زيادة +${fmt(df)}</span>`
+        : `<span class="badge warn">عجز ${fmt(df)}</span>`;
+    return `<tr>
+      <td><strong>${k}</strong></td>
+      <td>${fmt(op)}</td><td>${fmt(rv)}</td><td>${fmt(im)}</td><td>${fmt(om)}</td>
+      <td>${fmt(sl)}</td><td>${fmt(ws)}</td><td>${fmt(hp)}</td>
+      <td style="font-weight:500;color:var(--purple)">${fmt(bk)}</td>
+      <td>${fmt(ac)}</td>
+      <td style="font-weight:500;color:${df >= 0 ? 'var(--teal)' : 'var(--red)'}">${fmt(df)}</td>
+      <td>${badge}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── EXPORT ──────────────────────────────────────────────
+function getReportData() {
+  const allKeys = [...new Set([
+    ...Object.keys(state.opening),
+    ...Object.keys(state.recv),
+    ...Object.keys(state.inMove),
+    ...Object.keys(state.outMove),
+    ...Object.keys(state.salesConsumption),
+    ...Object.keys(state.waste),
+    ...Object.keys(state.hosp),
+    ...Object.keys(state.stock)
+  ])];
+  return allKeys.map(k => {
+    const op = state.opening[k] || 0;
+    const rv = state.recv[k] || 0;
+    const im = state.inMove[k] || 0;
+    const om = state.outMove[k] || 0;
+    const sl = (state.salesConsumption)[k] || 0;
+    const ws = state.waste[k] || 0;
+    const hp = state.hosp[k] || 0;
+    const bk = op + rv + im - om - sl - ws - hp;
+    const ac = state.stock[k] || 0;
+    const df = ac - bk;
+    return [k, fmt(op), fmt(rv), fmt(im), fmt(om), fmt(sl), fmt(ws), fmt(hp), fmt(bk), fmt(ac), fmt(df), df === 0 ? 'مطابق' : df > 0 ? 'زيادة' : 'عجز'];
+  });
+}
+
+function exportReport() {
+  const header = ['الصنف', 'رصيد أول', 'استلامات', 'وارد', 'صادر', 'مبيعات', 'ويست', 'ضيافات', 'دفترى', 'فعلى', 'الفرق', 'الحالة'];
+  const rows = [header, ...getReportData()];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = rows[0].map(() => ({ wch: 14 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'تقرير الجرد');
+  XLSX.writeFile(wb, 'inventory_report.xlsx');
+  toast('تم تصدير Excel ✓');
+}
+
+function exportCSV() {
+  const header = ['الصنف', 'رصيد أول', 'استلامات', 'وارد', 'صادر', 'مبيعات', 'ويست', 'ضيافات', 'دفترى', 'فعلى', 'الفرق', 'الحالة'];
+  const rows = [header, ...getReportData()];
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'inventory_report.csv'; a.click();
+  URL.revokeObjectURL(url);
+  toast('تم تصدير CSV ✓');
+}
+
+function exportPDF() {
+  calcAll();
+  const title = document.title;
+  document.title = 'تقرير الجرد والرصيد — ' + new Date().toLocaleDateString('ar-EG');
+  window.print();
+  document.title = title;
+}
+
+// ─── INIT ────────────────────────────────────────────────
+function bindFile(id, handler) {
+  document.getElementById(id).addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) return;
+    handler(file);
+    this.value = '';
+  });
+}
+
+bindFile('f-opening', file => loadFile('opening', file));
+bindFile('f-in',      file => loadFile('in', file));
+bindFile('f-out',     file => loadFile('out', file));
+bindFile('f-recipe',  file => loadRecipes(file));
+bindFile('f-sold',    file => loadSold(file));
+bindFile('f-waste',   file => loadFile('waste', file));
+bindFile('f-hosp-recipe', file => loadHospRecipes(file));
+bindFile('f-hosp',    file => loadFile('hosp', file));
+bindFile('f-stock',   file => loadFile('stock', file));
+updateDaySlots();
+</script>
+</body>
+</html>
